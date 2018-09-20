@@ -1,9 +1,11 @@
 import tensorflow as tf
 import os
+from tensorflow.python.ops import confusion_matrix
+from tensorflow.python.ops import math_ops
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 data_dir = ['./data/dataset.csv']
-batch_size = 2
+batch_size = 1
 DROPOHT_RATE = 0.3
 LEARNING_RATE = 0.3
 
@@ -24,8 +26,8 @@ def seq_processing(seq):
 def create_file_reader_ops(filename_queue):
     reader = tf.TextLineReader(skip_header_lines=1)
     _, csv_row = reader.read(filename_queue)
-    record_defaults = [[""], [""], [0.0]]
-    onTargetSEQ, offTargetSEQ, label = tf.decode_csv(csv_row, record_defaults=record_defaults)
+    record_defaults = [[""], [""], [000.000]]
+    onTargetSEQ, offTargetSEQ, label = tf.decode_csv(csv_row, record_defaults=record_defaults, field_delim=",")
 
     onTargetSEQ = tf.reshape(onTargetSEQ, [1])
     onTarget = seq_processing(onTargetSEQ)
@@ -94,8 +96,14 @@ model_Pred = model()
 
 
 mse = tf.losses.mean_squared_error(model_Pred, batch_label)
+
 adamOpt = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 train_step = adamOpt.minimize(mse)
+
+l, p = confusion_matrix.remove_squeezable_dimensions(batch_label, model_Pred)
+s = math_ops.square(p - l)
+mean_t = math_ops.reduce_mean(s)
+
 #onTarget_data = tf.placeholder(tf.float32, [batch_size, onTargetLen, 4])
 #offTarget_data = tf.placeholder(tf.float32, [batch_size, offTargetLen, 4])
 #label_data = tf.placeholder(tf.float32, [batch_size,])
@@ -111,14 +119,18 @@ with tf.Session() as sess:
     threads = tf.train.start_queue_runners(coord=coord)
 
     i=1
-    while (i < 2):
+    while (i < 10000000):
         try:
+            onT, lab = sess.run([batch_onTarget, batch_label])
 
-            example_data = sess.run(train_step)
-            print(example_data)
+            sess.run([train_step])
+            e_val = sess.run(mse)
+            print("STEP", i, ": LABEL ", lab, " MSE : ", e_val)
+
             i = i+1
         except tf.errors.OutOfRangeError:
             break
+
 
     coord.request_stop()
     coord.join(threads)
