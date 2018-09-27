@@ -5,9 +5,9 @@ from tensorflow.python.ops import math_ops
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 data_dir = ['./data/dataset.csv']
-batch_size = 1
-DROPOHT_RATE = 0.3
-LEARNING_RATE = 0.3
+batch_size = 100
+DROPOHT_RATE = 0.5
+LEARNING_RATE = 0.0001
 
 letters = "ACGT"
 onTargetLen = 20
@@ -119,13 +119,13 @@ with tf.Session() as sess:
     threads = tf.train.start_queue_runners(coord=coord)
 
     i=1
-    while (i < 10000000):
+    while (True):
         try:
             onT, lab = sess.run([batch_onTarget, batch_label])
 
             sess.run([train_step])
             e_val = sess.run(mse)
-            print("STEP", i, ": LABEL ", lab, " MSE : ", e_val)
+            print("STEP", i, ": LABEL ", len(lab), " MSE : ", e_val)
 
             i = i+1
         except tf.errors.OutOfRangeError:
