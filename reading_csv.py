@@ -4,10 +4,10 @@ from tensorflow.python.ops import confusion_matrix
 from tensorflow.python.ops import math_ops
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-data_dir = ['./data/dataset.csv']
-batch_size = 100
+data_dir = ['./data/train.csv']
+batch_size = 50
 DROPOHT_RATE = 0.5
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.00001
 
 letters = "ACGT"
 onTargetLen = 20
@@ -16,7 +16,7 @@ offTargetLen = 23
 mapping_letters = tf.string_split([letters], delimiter="")
 
 def init_weights(shape, stddev = 0.03):
-    return tf.Variable(tf.truncated_normal(shape, stddev))
+    return tf.Variable(tf.random_normal(shape, stddev))
 def seq_processing(seq):
     table = tf.contrib.lookup.index_table_from_tensor(mapping=mapping_letters.values, default_value=0)
     seq_char = tf.string_split(seq, delimiter="")
@@ -94,23 +94,16 @@ onTarget, offTarget, label = create_file_reader_ops(filename_queue)
 batch_onTarget, batch_offTarget, batch_label = tf.train.batch([onTarget, offTarget, label], shapes=[[onTargetLen,4], [offTargetLen,4], [1]], batch_size=batch_size)
 model_Pred = model()
 
+l, p = confusion_matrix.remove_squeezable_dimensions(batch_label, model_Pred)
+s = math_ops.square(p - l)
+mean_t = math_ops.reduce_mean(s)
 
 mse = tf.losses.mean_squared_error(model_Pred, batch_label)
 
 adamOpt = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 train_step = adamOpt.minimize(mse)
 
-l, p = confusion_matrix.remove_squeezable_dimensions(batch_label, model_Pred)
-s = math_ops.square(p - l)
-mean_t = math_ops.reduce_mean(s)
-
-#onTarget_data = tf.placeholder(tf.float32, [batch_size, onTargetLen, 4])
-#offTarget_data = tf.placeholder(tf.float32, [batch_size, offTargetLen, 4])
-#label_data = tf.placeholder(tf.float32, [batch_size,])
-
-#output = model(onTarget_data, offTarget_data, label_data)
-
-
+saver = tf.train.Saver()
 with tf.Session() as sess:
     tf.global_variables_initializer().run()
     tf.tables_initializer().run()
@@ -128,6 +121,8 @@ with tf.Session() as sess:
             print("STEP", i, ": LABEL ", len(lab), " MSE : ", e_val)
 
             i = i+1
+            if(i % 2000):
+                saver.save(sess, './save_model/MSEmodel', global_step=i)
         except tf.errors.OutOfRangeError:
             break
 

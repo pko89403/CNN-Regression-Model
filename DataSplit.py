@@ -9,15 +9,17 @@ test = 'E:/python_workspace/CNN-Regression-Model/data/test.csv'
 with open(dataset, "r") as f:
     data = f.read().split('\n')
     data = np.array(data)
-    x_train, x_test = train_test_split(data, test_size=0.1,random_state=42)
+    x_train, x_test = train_test_split(data, test_size=0.1)
 
     with open(train, 'w') as train:
         for x in x_train:
             train.write(x + '\n')
+        train.write('\r')
     train.close()
 
     with open(test, 'w') as test:
         for x in x_test:
             test.write(x + '\n')
+        test.write('\r')
     test.close()
 f.close()
