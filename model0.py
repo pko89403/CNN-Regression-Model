@@ -7,7 +7,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 data_dir = ['./data/train.csv']
 model_saveDir = './save_model/'
-batch_size = 64
+batch_size = 5996
 DROPOHT_RATE = 0.3
 LEARNING_RATE = 0.0001
 
@@ -84,16 +84,16 @@ def model():
     targetConcat_Flat = tf.contrib.layers.flatten(targetConcat)
     targetConcat_Flat_Drop = tf.nn.dropout(targetConcat_Flat, DROPOHT_RATE)
 
-    fc1 = tf.nn.leaky_relu(tf.matmul(targetConcat_Flat_Drop, fc1_W) + fc1_B)
+    fc1 = tf.nn.sigmoid(tf.matmul(targetConcat_Flat_Drop, fc1_W) + fc1_B)
     fc1_Drop = tf.nn.dropout(fc1, DROPOHT_RATE)
 
-    fc2 = tf.nn.leaky_relu(tf.matmul(fc1_Drop, fc2_W) + fc2_B)
+    fc2 = tf.nn.sigmoid(tf.matmul(fc1_Drop, fc2_W) + fc2_B)
     fc2_Drop = tf.nn.dropout(fc2, DROPOHT_RATE)
 
-    fc3 = tf.nn.leaky_relu(tf.matmul(fc2_Drop, fc3_W) + fc3_B)
+    fc3 = tf.nn.sigmoid(tf.matmul(fc2_Drop, fc3_W) + fc3_B)
     fc3_Drop = tf.nn.dropout(fc3, DROPOHT_RATE)
 
-    result = tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B)
+    result = tf.nn.relu(tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B))
 
     return result
 
@@ -105,7 +105,7 @@ batch_onTarget, batch_offTarget, batch_label = tf.train.batch([onTarget, offTarg
                                                               batch_size=batch_size)
 model_Pred = model()
 
-loss = tf.reduce_sum(tf.square(model_Pred-batch_label))
+loss = tf.reduce_mean(tf.square(model_Pred-batch_label))
 adamOpt = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 train_step = adamOpt.minimize(loss)
 
@@ -125,13 +125,9 @@ with tf.Session() as sess:
     while (True):
         try:
 
-            opt, mse = sess.run([train_step, mean_t])
+            opt, mse, l, p = sess.run([train_step, mean_t, batch_label, model_Pred])
+            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse, " l : ", l, " p : ", p)
 
-            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse)
-
-            if (i % 100 == 0):
-                saver.save(sess, model_saveDir+'model0', i)
-                if(i % 50000 == 0): break
             i = i + 1
         except tf.errors.OutOfRangeError:
             break

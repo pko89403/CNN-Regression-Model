@@ -5,11 +5,11 @@ from tensorflow.python.ops import math_ops
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-data_dir = ['./data/train.csv']
+data_dir = ['./data/train2.csv']
 model_saveDir = './save_model/'
-batch_size = 64
+batch_size = 5996
 DROPOHT_RATE = 0.3
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 
 letters = "ACGT"
 onTargetLen = 20
@@ -24,28 +24,25 @@ def init_bias(shape):
     return tf.Variable(tf.zeros(shape))
 
 # Weights & Bias For Model
-conICh = 4
-convOCH = 40
-onTargetFilter = 3 # 20 - 3
-offTargetFilter = 6 # 23 - 6
 
-onTargetW1 = init_weights(shape=[onTargetFilter, conICh, convOCH], stddev=0.01)
-onTargetB1 = init_bias(shape=[convOCH])
+onT1_W = init_weights(shape=[80, 160], stddev=0.03)
+onT1_B = init_weights(shape=[160])
 
-offTargetW1 = init_weights(shape=[offTargetFilter, conICh, convOCH], stddev=0.01)
-offTargetB1 = init_bias(shape=[convOCH])
+onT2_W = init_weights(shape=[160, 320], stddev=0.03)
+onT2_B = init_weights(shape=[320])
 
-fc1_W = init_weights(shape=[17 * 80, 80], stddev=0.01)
-fc1_B = init_bias(shape=[80])
+onT3_W = init_weights(shape=[320, 1], stddev=0.03)
+onT3_B = init_weights(shape=[1])
 
-fc2_W = init_weights(shape=[80, 20], stddev=0.01)
-fc2_B = init_bias(shape=[20])
+offT1_W = init_weights(shape=[92, 184], stddev=0.03)
+offT1_B = init_weights(shape=[184])
 
-fc3_W = init_weights(shape=[20, 20], stddev=0.01)
-fc3_B = init_bias(shape=[20])
+offT2_W = init_weights(shape=[184, 368], stddev=0.03)
+offT2_B = init_weights(shape=[368])
 
-fc4_W = init_weights(shape=[20, 1], stddev=0.01)
-fc4_B = init_bias(shape=[1])
+offT3_W = init_weights(shape=[368, 1], stddev=0.03)
+offT3_B = init_weights(shape=[1])
+
 
 
 def seq_processing(seq):
@@ -53,8 +50,6 @@ def seq_processing(seq):
     seq_char = tf.string_split(seq, delimiter="")
     encoded = tf.one_hot(table.lookup(seq_char.values), len(letters), dtype=tf.float32)
     return encoded
-
-
 def create_file_reader_ops(filename_queue):
     reader = tf.TextLineReader(skip_header_lines=0)
     _, csv_row = reader.read(filename_queue)
@@ -67,31 +62,27 @@ def create_file_reader_ops(filename_queue):
     offTarget = seq_processing(offTargetSEQ)
     label = tf.reshape(label, [1])
     return onTarget, offTarget, label
-
-
 def model():
-    onTargetConv = tf.nn.conv1d(batch_onTarget, onTargetW1, stride=1, padding="VALID")  # (1, 18, 80)
-    onTargetConv_Relu = tf.nn.leaky_relu(onTargetConv + onTargetB1)
-    onTargetConv_Relu_Pool = tf.nn.pool(onTargetConv_Relu, window_shape=[2], padding="VALID",
-                                        pooling_type="MAX")  # (1, 17, 80)
+    onTarget_Flat = tf.contrib.layers.flatten(batch_onTarget) #(-1, 80)
+    offTarget_Flat = tf.contrib.layers.flatten(batch_offTarget) #(-1, 92)
 
-    offTargetConv = tf.nn.conv1d(batch_offTarget, offTargetW1, stride=1, padding="VALID")  # (1, 18, 80)
-    offTargetConv_Relu = tf.nn.leaky_relu(offTargetConv + offTargetB1)
-    offTargetConv_Relu_Pool = tf.nn.pool(offTargetConv_Relu, window_shape=[2], padding="VALID",
-                                         pooling_type="MAX")  # (1, 17, 80)
+    onTarget1 = tf.nn.sigmoid(tf.matmul(onTarget_Flat, onT1_W) + onT1_B)
+    onTarget1_Drop = tf.nn.dropout(onTarget1, DROPOHT_RATE)
 
-    targetConcat = tf.concat([onTargetConv_Relu_Pool, offTargetConv_Relu_Pool], axis=-1)  # (1, 17, 160)
+    onTarget2 = tf.nn.sigmoid(tf.matmul(onTarget1_Drop, onT2_W) + onT2_B)
+    onTarget2_Drop = tf.nn.dropout(onTarget2, DROPOHT_RATE)
 
-    targetConcat_Flat = tf.contrib.layers.flatten(targetConcat)
-    targetConcat_Flat_Drop = tf.nn.dropout(targetConcat_Flat, DROPOHT_RATE)
+    onTarget3 = tf.matmul(onTarget2_Drop, onT3_W) + onT3_B
 
-    fc1 = tf.nn.leaky_relu(tf.matmul(targetConcat_Flat_Drop, fc1_W) + fc1_B)
-    fc1_Drop = tf.nn.dropout(fc1, DROPOHT_RATE)
+    offTarget1 = tf.nn.sigmoid(tf.matmul(offTarget_Flat, offT1_W) + offT1_B)
+    offTarget1_Drop = tf.nn.dropout(offTarget1, DROPOHT_RATE)
 
-    fc2 = tf.nn.leaky_relu(tf.matmul(fc1_Drop, fc2_W) + fc2_B)
-    fc2_Drop = tf.nn.dropout(fc2, DROPOHT_RATE)
+    offTarget2 = tf.nn.sigmoid(tf.matmul(offTarget1_Drop, offT2_W) + offT2_B)
+    offTarget2_Drop = tf.nn.dropout(offTarget2, DROPOHT_RATE)
 
-    result = tf.add(tf.matmul(fc2_Drop, fc3_W), fc3_B)
+    offTarget3 = tf.matmul(offTarget2_Drop, offT3_W) + offT3_B
+
+    result = tf.add(onTarget3, offTarget3)
 
     return result
 
@@ -101,9 +92,10 @@ onTarget, offTarget, label = create_file_reader_ops(filename_queue)
 batch_onTarget, batch_offTarget, batch_label = tf.train.batch([onTarget, offTarget, label],
                                                               shapes=[[onTargetLen, 4], [offTargetLen, 4], [1]],
                                                               batch_size=batch_size)
+
 model_Pred = model()
 
-loss = tf.reduce_mean(tf.square(model_Pred-batch_label))
+loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=model_Pred, labels=batch_label))
 adamOpt = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 train_step = adamOpt.minimize(loss)
 
@@ -123,12 +115,8 @@ with tf.Session() as sess:
     while (True):
         try:
 
-            opt, mse = sess.run([train_step, mean_t])
-
-            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse)
-
-            if (i % 100 == 0):
-                saver.save(sess, model_saveDir+'model1', i)
+            opt, mse, l, p = sess.run([train_step, loss, batch_label, model_Pred])
+            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse, " l : ", l, " p : ", p)
 
             i = i + 1
         except tf.errors.OutOfRangeError:

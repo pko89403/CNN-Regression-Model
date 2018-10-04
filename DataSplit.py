@@ -1,7 +1,7 @@
 from sklearn.model_selection import train_test_split
 import numpy as np
 
-dataset = 'E:/python_workspace/CNN-Regression-Model/data/original/splib_target_indel_30.csv'
+dataset = 'E:/python_workspace/CNN-Regression-Model/data/target_indel_20.csv'
 train = 'E:/python_workspace/CNN-Regression-Model/data/train.csv'
 test = 'E:/python_workspace/CNN-Regression-Model/data/test.csv'
 
