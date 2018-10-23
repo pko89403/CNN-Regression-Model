@@ -70,12 +70,12 @@ def create_file_reader_ops(filename_queue):
 
 def model():
     onTargetConv = tf.nn.conv1d(batch_onTarget, onTargetW1, stride=1, padding="VALID")  # (1, 18, 80)
-    onTargetConv_Relu = tf.nn.leaky_relu(onTargetConv + onTargetB1)
+    onTargetConv_Relu = tf.nn.sigmoid(onTargetConv + onTargetB1)
     onTargetConv_Relu_Pool = tf.nn.pool(onTargetConv_Relu, window_shape=[2], padding="VALID",
                                         pooling_type="AVG")  # (1, 17, 80)
 
     offTargetConv = tf.nn.conv1d(batch_offTarget, offTargetW1, stride=1, padding="VALID")  # (1, 18, 80)
-    offTargetConv_Relu = tf.nn.leaky_relu(offTargetConv + offTargetB1)
+    offTargetConv_Relu = tf.nn.sigmoid(offTargetConv + offTargetB1)
     offTargetConv_Relu_Pool = tf.nn.pool(offTargetConv_Relu, window_shape=[2], padding="VALID",
                                          pooling_type="AVG")  # (1, 17, 80)
 
@@ -93,7 +93,7 @@ def model():
     fc3 = tf.nn.sigmoid(tf.matmul(fc2_Drop, fc3_W) + fc3_B)
     fc3_Drop = tf.nn.dropout(fc3, DROPOHT_RATE)
 
-    result = tf.nn.relu(tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B))
+    result = tf.nn.sigmoid(tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B))
 
     return result
 

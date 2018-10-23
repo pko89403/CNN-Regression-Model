@@ -5,11 +5,11 @@ from tensorflow.python.ops import math_ops
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-data_dir = ['./data/train.csv']
+data_dir = ['./data/train2.csv']
 model_saveDir = './save_model/'
 batch_size = 5996
 DROPOHT_RATE = 0.3
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.0001
 
 letters = "ACGT"
 onTargetLen = 20
@@ -87,9 +87,9 @@ def create_file_reader_ops(filename_queue):
     offTarget = seq_processing(offTargetSEQ)
     label = tf.reshape(label, [1])
     return onTarget, offTarget, label
-def model():
-    onTarget_Flat = tf.contrib.layers.flatten(batch_onTarget) #(-1, 80)
-    offTarget_Flat = tf.contrib.layers.flatten(batch_offTarget) #(-1, 92)
+def model(onTX, offTX, Y):
+    onTarget_Flat = tf.contrib.layers.flatten(onTX) #(-1, 80)
+    offTarget_Flat = tf.contrib.layers.flatten(offTX) #(-1, 92)
 
     onTarget1 = tf.nn.sigmoid(tf.matmul(onTarget_Flat, onT1_W) + onT1_B)
     onTarget1_Drop = tf.nn.dropout(onTarget1, DROPOHT_RATE)
@@ -131,9 +131,9 @@ def model():
 
     offTarget7 = tf.matmul(offTarget6_Drop, offT7_W) + offT_W
 
-    result = (onTarget7  + offTarget7)
+    result = (onTarget7 * onT_W  + offTarget7 * offT_W) + merge_B
 
-    return result
+    return result, Y
 
 
 filename_queue = tf.train.string_input_producer(data_dir)
@@ -142,12 +142,12 @@ batch_onTarget, batch_offTarget, batch_label = tf.train.batch([onTarget, offTarg
                                                               shapes=[[onTargetLen, 4], [offTargetLen, 4], [1]],
                                                               batch_size=batch_size)
 
-model_Pred = model()
+model_Pred, label_Y = model(batch_onTarget, batch_offTarget, batch_label)
 
-loss = tf.reduce_mean(tf.square(model_Pred-batch_label))
+loss = tf.reduce_sum(tf.square(model_Pred-batch_label))
+
 adamOpt = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 train_step = adamOpt.minimize(loss)
-
 l, p = confusion_matrix.remove_squeezable_dimensions(batch_label, model_Pred)
 s = tf.square(p - l)
 mean_t = tf.reduce_mean(s)
@@ -164,11 +164,8 @@ with tf.Session() as sess:
     while (True):
         try:
 
-            opt, mse, l, p = sess.run([train_step, loss, batch_label, model_Pred])
-            if(i % 100 == 0):
-                print(i, " Step - AdamOpt : ", opt, " MSE : ", mse, " l : ", l, " p : ", p)
-            if(i == 5000):
-                break
+            opt, mse, l, p = sess.run([train_step, mean_t, label_Y, model_Pred])
+            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse, "\n l : \n", l, "\n p : \n", p)
             i = i + 1
         except tf.errors.OutOfRangeError:
             break

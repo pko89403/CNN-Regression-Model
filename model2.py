@@ -5,11 +5,11 @@ from tensorflow.python.ops import math_ops
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-data_dir = ['./data/train.csv']
+data_dir = ['./data/train2.csv']
 model_saveDir = './save_model/'
-batch_size = 100
+batch_size = 5996
 DROPOHT_RATE = 0.3
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 
 letters = "ACGT"
 onTargetLen = 20
@@ -55,7 +55,7 @@ onTargetFilter = 5 # 20 - 5 + 1 = 16
 onTargetW1 = init_weights(shape=[onTargetFilter, conICh, convOCH], stddev=0.01)
 onTargetB1 = init_weights(shape=[convOCH], stddev=0.01)
 onTargetConv = tf.nn.conv1d(batch_onTarget, onTargetW1, stride=1, padding="VALID")  # (1, 16, 256)
-onTargetConv_Relu = tf.nn.relu(onTargetConv + onTargetB1)
+onTargetConv_Relu = tf.nn.sigmoid(onTargetConv + onTargetB1)
 onTargetConv_Relu_Pool = tf.nn.pool(onTargetConv_Relu, window_shape=[2], padding="VALID",
                                     pooling_type="AVG")  # (1, 15, 256)
 
@@ -63,7 +63,7 @@ onTargetFilter2 = 5 # 15 - 5 + 1
 onTargetW2 = init_weights(shape=[onTargetFilter2, convOCH, conv0CH2], stddev=0.01)
 onTargetB2 = init_weights(shape=[conv0CH2], stddev=0.01)
 onTargetConv2 = tf.nn.conv1d(onTargetConv_Relu_Pool, onTargetW2, stride=1, padding="VALID")  # (1, 16, 256)
-onTargetConv2_Relu = tf.nn.relu(onTargetConv2 + onTargetB2)
+onTargetConv2_Relu = tf.nn.sigmoid(onTargetConv2 + onTargetB2)
 onTargetConv2_Relu_Pool = tf.nn.pool(onTargetConv2_Relu, window_shape=[2], padding="VALID",
                                     pooling_type="AVG")  # (1, 10, 512)
 
@@ -71,7 +71,7 @@ offTargetFilter = 8 # 23 - 8 + 1
 offTargetW1 = init_weights(shape=[offTargetFilter, conICh, convOCH], stddev=0.01)
 offTargetB1 = init_weights(shape=[convOCH], stddev=0.01)
 offTargetConv = tf.nn.conv1d(batch_offTarget, offTargetW1, stride=1, padding="VALID")  # (1, 16, 256)
-offTargetConv_Relu = tf.nn.relu(offTargetConv + offTargetB1)
+offTargetConv_Relu = tf.nn.sigmoid(offTargetConv + offTargetB1)
 offTargetConv_Relu_Pool = tf.nn.pool(offTargetConv_Relu, window_shape=[2], padding="VALID",
                                      pooling_type="AVG")  # (1, 15, 256)
 
@@ -80,7 +80,7 @@ offTargetFilter2 = 5 # 15 - 5 + 1
 offTargetW2 = init_weights(shape=[offTargetFilter2, convOCH, conv0CH2], stddev=0.01)
 offTargetB2 = init_weights(shape=[conv0CH2], stddev=0.01)
 offTargetConv2 = tf.nn.conv1d(offTargetConv_Relu_Pool, offTargetW2, stride=1, padding="VALID")  # (1, 16, 256)
-offTargetConv2_Relu = tf.nn.relu(offTargetConv2 + offTargetB2)
+offTargetConv2_Relu = tf.nn.sigmoid(offTargetConv2 + offTargetB2)
 offTargetConv2_Relu_Pool = tf.nn.pool(offTargetConv2_Relu, window_shape=[2], padding="VALID",
                                      pooling_type="AVG")  # (1, 10, 256)
 
@@ -113,7 +113,7 @@ fc2_Drop = tf.nn.dropout(fc2, DROPOHT_RATE)
 fc3 = tf.nn.relu(tf.matmul(fc2_Drop, fc3_W) + fc3_B)
 fc3_Drop = tf.nn.dropout(fc3, DROPOHT_RATE)
 
-model_Pred = tf.nn.sigmoid(tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B))
+model_Pred = tf.add(tf.matmul(fc3_Drop, fc4_W), fc4_B)
 
 
 loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=model_Pred, labels=batch_label))
@@ -137,10 +137,9 @@ with tf.Session() as sess:
         try:
 
             opt, mse = sess.run([train_step, mean_t])
-            print(i, " Step - AdamOpt : ", opt, " MSE : ", mse)
 
-            if (i % 10000 == 0):
-                saver.save(sess, model_saveDir+'model2', i)
+            if (i % 100 == 0):
+                print(i, " Step - AdamOpt : ", opt, " MSE : ", mse)
             i = i + 1
         except tf.errors.OutOfRangeError:
             break
